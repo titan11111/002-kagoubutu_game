@@ -1,34 +1,130 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>化合物クイズ</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+  <title>化合物ラボ — 反応式タイムアタック</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="title-screen">
-        <h1>化合物クイズ</h1>
-        <p class="subtitle">君は、未知の元素を探求する者か？<br>化合物の謎を解き明かし、未来の化学者になろう！</p>
-        <button id="start-btn">スタート</button>
+  <button id="mute-btn" class="mute-btn game-btn" aria-label="ミュート切替" type="button">🔊</button>
+  <div id="pop-fx" class="pop-fx" hidden aria-hidden="true">ポチッ</div>
+
+  <!-- タイトル（サイケデリック） -->
+  <div id="screen-title" class="screen screen-title">
+    <div class="psy-bg" aria-hidden="true">
+      <div class="psy-swirl psy-swirl-a"></div>
+      <div class="psy-swirl psy-swirl-b"></div>
+      <div class="psy-swirl psy-swirl-c"></div>
+      <div class="psy-ring"></div>
+      <span class="float-mol m1">H₂O</span>
+      <span class="float-mol m2">CO₂</span>
+      <span class="float-mol m3">NaCl</span>
+      <span class="float-mol m4">FeS₂</span>
+      <span class="float-mol m5">NH₃</span>
+      <span class="float-mol m6">SiO₂</span>
+      <span class="float-mol m7">CaCO₃</span>
+      <span class="float-mol m8">O₂</span>
     </div>
 
-    <div id="quiz-container" style="display:none;">
-        <h1>化合物クイズ</h1>
-        <div id="question-number"></div> <div id="question">読み込み中...</div>
-        <div id="choices" class="choices-grid"></div>
-        <div id="feedback"></div>
-        <button id="next-btn" style="display:none;">次の問題</button>
-        <div id="result" style="display:none;"></div>
-        <button id="restart-btn" style="display:none;">もう一回遊ぶ</button>
-        <a id="line-share" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">LINEでシェア</a>
+    <div class="title-hero">
+      <p class="brand-tag">CHEM TRIP LAB</p>
+      <h1 class="psy-title">
+        <span class="psy-title-line">化合物</span>
+        <span class="psy-title-line accent">ラボ</span>
+      </h1>
+      <p class="title-pulse">REACT · OR · EXPLODE</p>
+      <p class="subtitle">A列＋B列で物質を合成せよ<br>ハズしたらドカーン！連続で偉人になれ</p>
     </div>
 
-    <audio id="bgm" src="sounds/quiz.mp3" loop></audio>
-    <audio id="correct-sound" src="sounds/seikai.mp3"></audio>
-    <audio id="wrong-sound" src="sounds/fuseikai.mp3"></audio>
+    <p class="pick-label">▼ 実験室を選べ ▼</p>
+    <div class="level-row">
+      <button type="button" class="level-btn level-elem game-btn" data-level="elementary">
+        <span class="level-grade">小５</span>
+        <span class="level-name">バージョン</span>
+        <span class="level-desc">身近な物質 · 30問</span>
+      </button>
+      <button type="button" class="level-btn level-junior game-btn" data-level="junior">
+        <span class="level-grade">中３</span>
+        <span class="level-name">バージョン</span>
+        <span class="level-desc">酸・塩基・鉱物 · 137問</span>
+      </button>
+    </div>
+  </div>
 
-    <script src="quizData.js"></script>
-    <script src="script.js"></script>
+  <!-- プレイ（縦長専用レイアウト） -->
+  <div id="screen-play" class="screen screen-play" hidden>
+    <div class="psy-bg psy-bg-dim" aria-hidden="true">
+      <div class="psy-swirl psy-swirl-a"></div>
+      <div class="psy-swirl psy-swirl-b"></div>
+    </div>
+
+    <header class="play-top">
+      <div class="hud">
+        <div class="hud-left">
+          <span id="streak-label">連続 0</span>
+          <span id="title-chip">見習い錬成士</span>
+          <span id="best-label">最高 0</span>
+        </div>
+        <div id="countdown" class="countdown idle">準備</div>
+      </div>
+      <div id="prompt" class="prompt">水を作れ！</div>
+      <div id="phase-tag" class="phase-tag">A列</div>
+      <div id="formula-preview" class="formula-preview">
+        <span id="slot-a" class="slot">？</span>
+        <span class="plus">＋</span>
+        <span id="slot-b" class="slot">？</span>
+        <span class="arrow">→</span>
+        <span id="slot-target" class="slot target-slot">？</span>
+      </div>
+    </header>
+
+    <div id="jan-banner" class="jan-banner" hidden>じゃん！</div>
+
+    <section class="play-main">
+      <div id="choices" class="choices"></div>
+      <button type="button" id="check-btn" class="check-btn game-btn" hidden disabled>CHECK</button>
+    </section>
+
+    <footer class="play-foot">
+      <div id="feedback" class="feedback" hidden></div>
+      <div id="explain" class="explain" hidden></div>
+      <button type="button" id="next-btn" class="action-btn game-btn" hidden>次へ</button>
+    </footer>
+  </div>
+
+  <!-- 結果 -->
+  <div id="screen-result" class="screen screen-result" hidden>
+    <div class="psy-bg psy-bg-dim" aria-hidden="true">
+      <div class="psy-swirl psy-swirl-c"></div>
+      <div class="psy-swirl psy-swirl-a"></div>
+    </div>
+    <div class="result-card">
+      <h2>実験終了！</h2>
+      <p id="result-streak" class="result-streak">連続正解 0</p>
+      <p id="result-best" class="result-best">最高記録 0</p>
+      <p id="result-title" class="result-title">君は【見習い錬成士】だ！</p>
+      <p id="result-msg" class="result-msg"></p>
+      <div class="result-actions">
+        <button type="button" id="retry-miss-btn" class="action-btn game-btn" hidden>ミスした問題だけ再挑戦</button>
+        <button type="button" id="retry-btn" class="action-btn primary game-btn">もう一度やる</button>
+        <button type="button" id="home-btn" class="action-btn game-btn">タイトルへ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 爆発オーバーレイ -->
+  <div id="boom-layer" class="boom-layer" hidden>
+    <div class="boom-flash"></div>
+    <div class="boom-text">ドカーン！！</div>
+    <canvas id="boom-canvas"></canvas>
+  </div>
+
+  <script src="quizData.js"></script>
+  <script src="audio.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>

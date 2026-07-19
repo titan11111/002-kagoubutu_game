@@ -1,184 +1,553 @@
-const bgm = document.getElementById('bgm');
-const correctSound = document.getElementById('correct-sound');
-const wrongSound = document.getElementById('wrong-sound');
+/* 化合物ラボ — A/B選択タイムアタック */
+(function () {
+  "use strict";
 
-const titleScreen = document.getElementById('title-screen');
-const startBtn = document.getElementById('start-btn');
-const quizContainer = document.getElementById('quiz-container');
+  const TIME_LIMIT = 10;
+  const BEST_KEY_PREFIX = "compound-lab-best-";
 
-const questionNumberEl = document.getElementById("question-number"); // 問題番号表示用要素
-const questionEl = document.getElementById("question");
-const choicesEl = document.getElementById("choices");
-const feedbackEl = document.getElementById("feedback");
-const nextBtn = document.getElementById("next-btn");
-const resultEl = document.getElementById("result");
-const restartBtn = document.getElementById("restart-btn");
-const lineShareBtn = document.getElementById("line-share");
+  const TITLES = [
+    { min: 0, name: "見習い錬成士", msg: "実験は始まったばかり！もう一回ふるえば、きっと見える世界が変わるぞ。" },
+    { min: 3, name: "ラボ見習い助手", msg: "いい感じ！ビーカーが君を呼んでいる。続けて称号を伸ばそう！" },
+    { min: 5, name: "ボイル級の探究者", msg: "気体の法則を愛したボイルに近づいた！あと少しで偉人街道だ。" },
+    { min: 10, name: "ラボアジエ級の測定士", msg: "質量保存の人・ラボアジエ級！10連続、堂々の称号だ！！" },
+    { min: 15, name: "アボガドロ級の分子使い", msg: "15連続！分子の数を見抜くアボガドロ級のセンスだ。" },
+    { min: 20, name: "メンデレーエフ級の予言者", msg: "20連続！周期表を組み立てたメンデレーエフ級、未来が見えてるぞ。" },
+    { min: 25, name: "キュリー級の開拓者", msg: "25連続…！放射線を切り拓いたキュリー夫妻級。その集中力、本物だ。" },
+    { min: 30, name: "超すごい人・ノーベル級", msg: "30連続は伝説級！！君はもう、教科書に載る側の人間だ。お、超すごい人だ！！" },
+  ];
 
-let isAudioStarted = false;
-let currentQuiz = [];
-let currentIndex = 0;
-let score = 0;
-let inExtraQuiz = false;
+  const VOICE = {
+    startA: ["まず問題を読もう。A列を選ぶとタイマー開始！", "問題を理解してからA列を選ぼう！"],
+    startB: ["10秒スタート！次はB列！", "ここから10秒！組み合わせを決めろ！"],
+    correct: ["ピンポン！正解！", "いいぞ！その調子！", "反応成功！"],
+    wrong: ["ドカーン！失敗だ！", "爆発したな！", "惜しい！やり直しだ！"],
+    timeout: ["時間切れ！爆発！", "遅いぞ！ドカーン！"],
+  };
 
-// quizData と extraQuizData は quizData.js に定義されている前提です。
-// もしこのファイル内に記述が必要な場合は、コメントアウトを外し、データ配列をここに移動してください。
-/*
-const quizData = [
-    // ... 既存のquizDataの内容 ...
-];
+  // DOM
+  const el = {
+    title: document.getElementById("screen-title"),
+    play: document.getElementById("screen-play"),
+    result: document.getElementById("screen-result"),
+    mute: document.getElementById("mute-btn"),
+    streak: document.getElementById("streak-label"),
+    titleChip: document.getElementById("title-chip"),
+    bestLabel: document.getElementById("best-label"),
+    countdown: document.getElementById("countdown"),
+    prompt: document.getElementById("prompt"),
+    phaseTag: document.getElementById("phase-tag"),
+    slotA: document.getElementById("slot-a"),
+    slotB: document.getElementById("slot-b"),
+    slotTarget: document.getElementById("slot-target"),
+    jan: document.getElementById("jan-banner"),
+    choices: document.getElementById("choices"),
+    check: document.getElementById("check-btn"),
+    feedback: document.getElementById("feedback"),
+    explain: document.getElementById("explain"),
+    next: document.getElementById("next-btn"),
+    resultStreak: document.getElementById("result-streak"),
+    resultBest: document.getElementById("result-best"),
+    resultTitle: document.getElementById("result-title"),
+    resultMsg: document.getElementById("result-msg"),
+    retryMiss: document.getElementById("retry-miss-btn"),
+    retry: document.getElementById("retry-btn"),
+    home: document.getElementById("home-btn"),
+    boom: document.getElementById("boom-layer"),
+    boomCanvas: document.getElementById("boom-canvas"),
+    popFx: document.getElementById("pop-fx"),
+  };
 
-const extraQuizData = [
-    // ... 既存のextraQuizDataの内容 ...
-];
-*/
+  let level = "elementary";
+  let deck = [];
+  let deckIndex = 0;
+  let streak = 0;
+  let savedBest = 0;
+  let isNewRecord = false;
+  let missed = [];
+  let missOnlyMode = false;
+  let current = null;
+  let selectedA = null;
+  let selectedB = null;
+  let phase = "idle"; // a | b | check | feedback
+  let timerId = null;
+  let timeLeft = TIME_LIMIT;
+  let locked = false;
 
-startBtn.addEventListener("click", () => {
-    titleScreen.style.display = "none";
-    quizContainer.style.display = "flex"; // flex に変更
-    startQuiz();
-    if (!isAudioStarted) {
-        bgm.volume = 0.3;
-        bgm.play();
-        isAudioStarted = true;
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
     }
-});
-
-function shuffleArray(array) {
-    return array.sort(() => Math.random() - 0.5);
-}
-
-function startQuiz(extra = false) {
-    inExtraQuiz = extra;
-    if (extra) {
-        currentQuiz = shuffleArray([...extraQuizData]).slice(0, 5); // エクストラは5問
-    } else {
-        currentQuiz = shuffleArray([...quizData]).slice(0, 10); // 通常は10問
-    }
-    currentIndex = 0;
-    score = 0;
-    resultEl.style.display = "none";
-    restartBtn.style.display = "none";
-    lineShareBtn.style.display = "none";
-    nextBtn.style.display = "none";
-    feedbackEl.textContent = "";
-    document.body.classList.remove('flash-correct', 'flash-wrong'); // フラッシュクラスをリセット
-    loadQuestion();
-}
-
-function loadQuestion() {
-    const quiz = currentQuiz[currentIndex];
-    questionNumberEl.textContent = `第 ${currentIndex + 1} 問 / ${currentQuiz.length}`; // 問題番号表示
-    questionEl.textContent = `${quiz.question}`; // "問題 X: " を削除
-    choicesEl.innerHTML = "";
-
-    const shuffledChoices = shuffleArray([...quiz.choices]);
-    shuffledChoices.forEach(choice => {
-        const btn = document.createElement("button");
-        btn.className = "choice";
-        btn.textContent = choice;
-        btn.onclick = () => selectAnswer(choice);
-        choicesEl.appendChild(btn);
-    });
-}
-
-function selectAnswer(choice) {
-    const quiz = currentQuiz[currentIndex];
-    Array.from(document.getElementsByClassName("choice")).forEach(btn => {
-        btn.disabled = true; // 全ての選択肢を無効化
-        if (btn.textContent === quiz.answer) {
-            btn.style.backgroundColor = '#a5d6a7'; // 正解のボタンを緑色に
-        } else if (btn.textContent === choice) {
-            btn.style.backgroundColor = '#ffcdd2'; // 不正解のボタンを赤色に
-        }
-    });
-
-    if (choice === quiz.answer) {
-        feedbackEl.textContent = `正解！🎉 ${quiz.episode}`;
-        score++;
-        correctSound.play();
-        flashScreen("correct");
-    } else {
-        feedbackEl.textContent = `残念！正解は「${quiz.answer}」でした！ ${quiz.episode}`; // 不正解時に正解を表示
-        wrongSound.play();
-        flashScreen("wrong");
-    }
-    
-    if (currentIndex < currentQuiz.length - 1) {
-      nextBtn.textContent = "次の問題へ進む！";
-      nextBtn.style.display = "inline-block";
-  } else {
-      nextBtn.textContent = "結果発表！";
-      nextBtn.style.display = "inline-block";
+    return a;
   }
-}
 
-function flashScreen(type) {
-    document.body.classList.remove('flash-correct', 'flash-wrong'); // 前のクラスを削除
-    document.body.classList.add(`flash-${type}`); // 新しいクラスを追加
-    setTimeout(() => {
-        document.body.classList.remove(`flash-${type}`);
-    }, 300);
-}
+  function pickVoice(list) {
+    return list[Math.floor(Math.random() * list.length)];
+  }
 
-nextBtn.addEventListener("click", () => {
-    currentIndex++;
-    if (currentIndex < currentQuiz.length) {
-        feedbackEl.textContent = "";
-        nextBtn.style.display = "none";
-        loadQuestion();
-    } else {
-        showResult();
+  function titleFor(n) {
+    let t = TITLES[0];
+    for (const row of TITLES) {
+      if (n >= row.min) t = row;
     }
-});
+    return t;
+  }
 
-function getTitle(score, extra = false) {
-    if (extra) {
-        if (score === 5) {
-            return { title: "【究極の賢者】メンデレーエフ", message: "完璧だ！！元素の周期表を完成させた天才、君は未来の化学界のパイオニアだ！" };
-        } else if (score >= 4) {
-            return { title: "【真理の探究者】ラボアジエ", message: "質量保存の法則を発見した偉人！君の探究心は本物だ！" };
-        } else if (score >= 3) {
-            return { title: "【知識の開拓者】ボイル", message: "気体の法則を解き明かした探求者！もう少しでトップレベルだ！" };
-        } else {
-            return { title: "【覚醒せし】科学者の卵", message: "成長中の若き科学者！挑戦あるのみ！君の化学の旅は始まったばかりだ！" };
-        }
-    } else {
-        if (score === 10) {
-            return { title: "【元素の支配者】ニュートン", message: "満点、お見事！君はまさに万有引力を発見した天才、未来の大化学者だ！" };
-        } else if (score >= 7) {
-            return { title: "【錬金術マスター】ガリレオ", message: "素晴らしい成績だ！君の探求心はガリレオのように尽きない！" };
-        } else if (score >= 4) {
-            return { title: "【反応の魔術師】パスカル", message: "なかなかやるな！あと一歩で偉大な科学者の仲間入りだ！" };
-        } else {
-            return { title: "【見習い錬成士】化学者見習い", message: "大丈夫！挑戦することが大切だ！諦めずに化合物の世界を探検しよう！" };
-        }
+  function updateHud() {
+    el.streak.textContent = `連続 ${streak}`;
+    el.titleChip.textContent = titleFor(streak).name;
+    el.bestLabel.textContent = `最高 ${Math.max(savedBest, streak)}`;
+  }
+
+  function bestKey() {
+    return `${BEST_KEY_PREFIX}${level}`;
+  }
+
+  function loadBest() {
+    const value = Number.parseInt(localStorage.getItem(bestKey()) || "0", 10);
+    savedBest = Number.isFinite(value) ? Math.max(0, value) : 0;
+  }
+
+  function saveBestIfNeeded() {
+    if (streak <= savedBest) return false;
+    savedBest = streak;
+    localStorage.setItem(bestKey(), String(savedBest));
+    isNewRecord = true;
+    return true;
+  }
+
+  function showScreen(name) {
+    el.title.hidden = name !== "title";
+    el.play.hidden = name !== "play";
+    el.result.hidden = name !== "result";
+  }
+
+  function clearTimer() {
+    if (timerId) {
+      clearInterval(timerId);
+      timerId = null;
     }
-}
+  }
 
-function showResult() {
-    const result = getTitle(score, inExtraQuiz);
-    questionNumberEl.textContent = ""; // 問題番号をクリア
-    questionEl.textContent = "";
-    choicesEl.innerHTML = "";
-    feedbackEl.textContent = "";
-    resultEl.style.display = "block";
-    resultEl.innerHTML = `キミの正解数は <span style="color:#d32f2f; font-size:1.2em;">${score}</span> / ${currentQuiz.length} 問だ！<br><br>きみは <strong>${result.title}</strong> だ！！<br>${result.message}<br>`;
+  function setCountdown(n, mode) {
+    el.countdown.textContent = String(n);
+    el.countdown.classList.toggle("warn", mode === "warn");
+    el.countdown.classList.toggle("idle", mode === "idle");
+  }
 
-    const shareUrl = encodeURIComponent('https://yourname.github.io/quiz'); // 実際のURLに変更してください
-    const shareText = encodeURIComponent(`化合物クイズ${inExtraQuiz ? 'エクストラ' : ''}で${score}/${currentQuiz.length}正解！きみは${result.title}だ！！挑戦してみよう！`);
-    lineShareBtn.href = `https://social-plugins.line.me/lineit/share?url=${shareUrl}&text=${shareText}`;
-    lineShareBtn.style.display = "inline-block";
+  function startTimer(onTimeout) {
+    clearTimer();
+    timeLeft = TIME_LIMIT;
+    setCountdown(timeLeft, "warn");
+    timerId = setInterval(() => {
+      timeLeft -= 1;
+      setCountdown(Math.max(0, timeLeft), "warn");
+      if (timeLeft <= 3 && timeLeft > 0) Sound.tick();
+      if (timeLeft <= 0) {
+        clearTimer();
+        onTimeout();
+      }
+    }, 1000);
+  }
 
-    if (!inExtraQuiz && score === 10) {
-        restartBtn.textContent = "エクストラクイズへ挑戦！";
-        restartBtn.onclick = () => startQuiz(true);
-    } else {
-        restartBtn.textContent = "もう一度、化合物の世界へ！";
-        restartBtn.onclick = () => startQuiz();
+  function buildChoices(correct, distractors) {
+    return shuffle([correct, ...distractors.slice(0, 3)]);
+  }
+
+  function showJan() {
+    el.jan.hidden = false;
+    Sound.jan();
+    setTimeout(() => { el.jan.hidden = true; }, 500);
+  }
+
+  /** ポチッ：視覚＋触覚＋音 */
+  function pochitt(btn) {
+    if (btn) {
+      btn.classList.add("is-press");
+      setTimeout(() => btn.classList.remove("is-press"), 120);
     }
-    restartBtn.style.display = "inline-block";
-}
+    if (el.popFx) {
+      el.popFx.hidden = false;
+      el.popFx.classList.remove("show");
+      // reflow でアニメ再発火
+      void el.popFx.offsetWidth;
+      el.popFx.classList.add("show");
+      clearTimeout(pochitt._t);
+      pochitt._t = setTimeout(() => {
+        el.popFx.classList.remove("show");
+        el.popFx.hidden = true;
+      }, 400);
+    }
+    Sound.tap();
+    if (navigator.vibrate) navigator.vibrate(14);
+  }
 
-// quizData.js は別途用意されているものとして、このファイルには記述していません。
-// もし、quizData.js の内容も含める必要がある場合は、その旨をお知らせください。
+  function renderChoices(items, onPick) {
+    el.choices.replaceChildren();
+    items.forEach((text) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "choice game-btn";
+      btn.textContent = text;
+      btn.addEventListener("pointerdown", () => {
+        if (locked || btn.disabled) return;
+        pochitt(btn);
+      });
+      btn.addEventListener("click", () => {
+        if (locked || btn.disabled) return;
+        onPick(text, btn);
+      });
+      el.choices.appendChild(btn);
+    });
+  }
+
+  function disableChoices() {
+    el.choices.querySelectorAll(".choice").forEach((b) => { b.disabled = true; });
+  }
+
+  function resetSlots() {
+    selectedA = null;
+    selectedB = null;
+    el.slotA.textContent = "？";
+    el.slotB.textContent = "？";
+    el.slotA.classList.remove("filled");
+    el.slotB.classList.remove("filled");
+    el.slotTarget.textContent = current ? current.target : "？";
+    el.check.hidden = true;
+    el.check.disabled = true;
+    el.feedback.hidden = true;
+    el.explain.hidden = true;
+    el.next.hidden = true;
+  }
+
+  function beginQuestion() {
+    if (deckIndex >= deck.length) {
+      // デッキ尽きたらシャッフルして継続（連続型）
+      const bank = missOnlyMode
+        ? missed.slice()
+        : getQuizBank(level).map((q, i) => ({ ...q, _id: `${level}-${i}-${q.target}` }));
+      if (!bank.length) {
+        endRun(false);
+        return;
+      }
+      deck = shuffle(bank);
+      deckIndex = 0;
+      if (missOnlyMode && !deck.length) {
+        endRun(false);
+        return;
+      }
+    }
+
+    current = deck[deckIndex];
+    locked = false;
+    phase = "a";
+    resetSlots();
+    el.prompt.textContent = `${current.target}を作れ！`;
+    el.phaseTag.textContent = "問題を読んでA列を選ぼう — 選ぶと10秒スタート";
+    setCountdown("準備", "idle");
+    updateHud();
+    showJan();
+    Sound.speak(pickVoice(VOICE.startA));
+
+    const opts = buildChoices(current.a, current.distractorsA);
+    renderChoices(opts, (text, btn) => {
+      if (phase !== "a") return;
+      selectedA = text;
+      el.slotA.textContent = text;
+      el.slotA.classList.add("filled");
+      el.choices.querySelectorAll(".choice").forEach((b) => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      disableChoices();
+      setTimeout(beginPhaseB, 280);
+    });
+  }
+
+  function beginPhaseB() {
+    if (locked) return;
+    phase = "b";
+    el.phaseTag.textContent = "B列 — 残り10秒以内に選べ";
+    showJan();
+    Sound.speak(pickVoice(VOICE.startB));
+
+    const opts = buildChoices(current.b, current.distractorsB);
+    renderChoices(opts, (text, btn) => {
+      if (phase !== "b") return;
+      selectedB = text;
+      el.slotB.textContent = text;
+      el.slotB.classList.add("filled");
+      el.choices.querySelectorAll(".choice").forEach((b) => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      disableChoices();
+      clearTimer();
+      setCountdown("✓", "idle");
+      phase = "check";
+      el.phaseTag.textContent = "CHECKで反応させろ！";
+      el.check.hidden = false;
+      el.check.disabled = false;
+    });
+    startTimer(() => failRound("timeout"));
+  }
+
+  function isCorrectCombo(a, b) {
+    return (a === current.a && b === current.b) || (a === current.b && b === current.a);
+  }
+
+  function onCheck() {
+    if (phase !== "check" || locked) return;
+    locked = true;
+    el.check.disabled = true;
+    clearTimer();
+
+    if (isCorrectCombo(selectedA, selectedB)) {
+      succeedRound();
+    } else {
+      failRound("wrong");
+    }
+  }
+
+  function succeedRound() {
+    phase = "feedback";
+    streak += 1;
+    saveBestIfNeeded();
+    updateHud();
+    Sound.pinpon();
+    Sound.speak(pickVoice(VOICE.correct));
+    document.body.classList.add("flash-ok");
+    setTimeout(() => document.body.classList.remove("flash-ok"), 350);
+
+    el.feedback.hidden = false;
+    el.feedback.className = "feedback ok";
+    el.feedback.textContent = "正解！ピンポンピンポン♪";
+    el.explain.hidden = false;
+    el.explain.textContent = current.explanation;
+    el.choices.replaceChildren();
+    el.check.hidden = true;
+    el.next.hidden = false;
+    el.next.textContent = "次の実験へ";
+    setCountdown("♪", "idle");
+  }
+
+  function failRound(reason) {
+    if (phase === "feedback") return;
+    locked = true;
+    phase = "feedback";
+    clearTimer();
+    disableChoices();
+    el.check.hidden = true;
+
+    if (current) {
+      const id = current._id || current.target;
+      if (!missed.some((m) => (m._id || m.target) === id)) {
+        missed.push(current);
+      }
+    }
+
+    Sound.explode();
+    Sound.speak(reason === "timeout" ? pickVoice(VOICE.timeout) : pickVoice(VOICE.wrong), 1.05);
+    runBoomEffect();
+
+    el.feedback.hidden = false;
+    el.feedback.className = "feedback ng";
+    el.feedback.textContent = reason === "timeout"
+      ? "時間切れ！ドカーン！！"
+      : "反応失敗！ドカーン！！";
+    el.explain.hidden = false;
+    const correctLine = `正解は ${current.a} ＋ ${current.b}`;
+    el.explain.textContent = `${correctLine}\n${current.explanation}`;
+    el.choices.replaceChildren();
+    el.next.hidden = false;
+    el.next.textContent = "結果を見る";
+    setCountdown("💥", "idle");
+  }
+
+  function goNextFromFeedback() {
+    if (el.feedback.classList.contains("ok")) {
+      deckIndex += 1;
+      beginQuestion();
+    } else {
+      endRun(true);
+    }
+  }
+
+  function endRun() {
+    clearTimer();
+    const t = titleFor(streak);
+    showScreen("result");
+    el.resultStreak.textContent = `連続正解 ${streak}`;
+    el.resultBest.textContent = isNewRecord
+      ? `🏆 NEW RECORD！最高記録 ${savedBest}`
+      : `最高記録 ${savedBest}`;
+    el.resultTitle.textContent = `君は【${t.name}】だ！`;
+    el.resultMsg.textContent = t.msg + (streak >= 30
+      ? ""
+      : `（次の称号まであと${nextTitleGap(streak)}連続）`);
+    el.retryMiss.hidden = missed.length === 0;
+    Sound.speak(`連続${streak}問正解。君は${t.name}だ！`);
+  }
+
+  function nextTitleGap(n) {
+    const next = TITLES.find((row) => row.min > n);
+    if (!next) return 0;
+    return next.min - n;
+  }
+
+  function runBoomEffect() {
+    el.boom.hidden = false;
+    const canvas = el.boomCanvas;
+    const ctx = canvas.getContext("2d");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const cx = W / 2;
+    const cy = H * 0.42;
+    const particles = [];
+    for (let i = 0; i < 90; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const sp = 3 + Math.random() * 14;
+      particles.push({
+        x: cx, y: cy,
+        vx: Math.cos(ang) * sp,
+        vy: Math.sin(ang) * sp - 2,
+        life: 1,
+        r: 3 + Math.random() * 8,
+        color: Math.random() > 0.5 ? "#ffeb3b" : (Math.random() > 0.5 ? "#ff5722" : "#fff")
+      });
+    }
+
+    let frames = 0;
+    function frame() {
+      frames += 1;
+      ctx.clearRect(0, 0, W, H);
+      particles.forEach((p) => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.25;
+        p.life -= 0.02;
+        p.vx *= 0.98;
+        if (p.life <= 0) return;
+        ctx.globalAlpha = Math.max(0, p.life);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+      if (frames < 55) requestAnimationFrame(frame);
+      else {
+        ctx.clearRect(0, 0, W, H);
+        el.boom.hidden = true;
+      }
+    }
+    requestAnimationFrame(frame);
+    if (navigator.vibrate) navigator.vibrate([40, 30, 80, 30, 120]);
+  }
+
+  function startGame(lv, onlyMiss) {
+    level = lv;
+    missOnlyMode = !!onlyMiss;
+    streak = 0;
+    isNewRecord = false;
+    loadBest();
+    if (!onlyMiss) missed = [];
+
+    const source = onlyMiss
+      ? missed.slice()
+      : getQuizBank(level).map((q, i) => ({ ...q, _id: `${level}-${i}-${q.target}` }));
+
+    if (!source.length) {
+      alert("問題がありません");
+      return;
+    }
+
+    // ミス再挑戦時は missed を消費用にコピーして空に近い運用：失敗したらまた積む
+    if (onlyMiss) {
+      missed = [];
+    }
+
+    deck = shuffle(source);
+    deckIndex = 0;
+    showScreen("play");
+    updateHud();
+    beginQuestion();
+  }
+
+  // —— イベント（ポチッ付き） ——
+  function bindPochittClick(node, handler) {
+    if (!node) return;
+    node.addEventListener("pointerdown", () => {
+      if (node.disabled) return;
+      pochitt(node);
+    });
+    node.addEventListener("click", async () => {
+      if (node.disabled) return;
+      await handler();
+    });
+  }
+
+  document.querySelectorAll(".level-btn").forEach((btn) => {
+    bindPochittClick(btn, async () => {
+      await Sound.unlock();
+      startGame(btn.dataset.level, false);
+    });
+  });
+
+  bindPochittClick(el.check, () => { onCheck(); });
+  bindPochittClick(el.next, () => { goNextFromFeedback(); });
+  bindPochittClick(el.retry, async () => {
+    await Sound.unlock();
+    startGame(level, false);
+  });
+  bindPochittClick(el.retryMiss, async () => {
+    await Sound.unlock();
+    if (!missed.length) return;
+    startGame(level, true);
+  });
+  bindPochittClick(el.home, () => {
+    clearTimer();
+    showScreen("title");
+  });
+  bindPochittClick(el.mute, () => {
+    const next = !Sound.isMuted();
+    Sound.setMuted(next);
+    el.mute.textContent = next ? "🔇" : "🔊";
+  });
+  el.mute.textContent = Sound.isMuted() ? "🔇" : "🔊";
+
+  // iOS 対策：ダブルタップズーム / 長押し選択 / ピンチ / スクロールバウンス
+  let lastTap = 0;
+  document.addEventListener("touchstart", (e) => {
+    const now = Date.now();
+    if (now - lastTap < 300) e.preventDefault();
+    lastTap = now;
+  }, { passive: false });
+
+  document.addEventListener("touchmove", (e) => {
+    const scrollable = e.target.closest(".explain, .screen-result");
+    if (scrollable) return;
+    e.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener("gesturestart", (e) => e.preventDefault());
+  document.addEventListener("gesturechange", (e) => e.preventDefault());
+  document.addEventListener("gestureend", (e) => e.preventDefault());
+  document.addEventListener("dblclick", (e) => e.preventDefault());
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  document.addEventListener("selectstart", (e) => e.preventDefault());
+  document.addEventListener("dragstart", (e) => e.preventDefault());
+
+  // フォーカス時のキーボードズーム予防（入力欄なしだが念のため）
+  document.addEventListener("focusin", (e) => {
+    if (e.target && e.target.blur && e.target.tagName !== "BUTTON") {
+      e.target.blur();
+    }
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") Sound.unlock();
+  });
+})();
