@@ -15,6 +15,28 @@
   --tap-min: 56px;
 }
 
+/* View Transitions API */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.38s;
+}
+::view-transition-old(root) {
+  animation-name: vtFadeOut;
+}
+::view-transition-new(root) {
+  animation-name: vtFadeIn;
+}
+@keyframes vtFadeOut {
+  to { opacity: 0; filter: blur(6px) hue-rotate(40deg); transform: scale(1.04); }
+}
+@keyframes vtFadeIn {
+  from { opacity: 0; filter: blur(6px) hue-rotate(-40deg); transform: scale(0.96); }
+}
+.screen-title { view-transition-name: screen-title; }
+.screen-play { view-transition-name: screen-play; }
+.screen-result { view-transition-name: screen-result; }
+.formula-anchor { view-transition-name: formula; }
+
 *, *::before, *::after {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
@@ -507,6 +529,7 @@ html, body {
   font-family: "Share Tech Mono", monospace;
   font-size: 0.95rem;
   overflow: hidden;
+  anchor-name: --formula-anchor;
 }
 .slot {
   min-width: 48px;
@@ -638,25 +661,85 @@ html, body {
 .feedback.ng { color: #ff7a9a; text-shadow: 0 0 12px rgba(255, 45, 149, 0.5); }
 .feedback[hidden] { display: none !important; }
 
-.explain {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(0, 240, 255, 0.35);
-  background: rgba(8, 0, 24, 0.82);
-  color: #e8f7ff;
-  font-size: 0.86rem;
-  line-height: 1.5;
+.explain-btn {
+  width: min(100%, 280px);
+  min-height: 48px;
+  margin: 4px 0 6px;
+  border-radius: 14px;
+  border: 2px solid var(--psy-lime);
+  background: rgba(40, 60, 0, 0.85);
+  color: var(--psy-lime);
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 1rem;
+  box-shadow: 0 0 14px rgba(184, 255, 0, 0.25);
+  flex-shrink: 0;
+}
+.explain-btn[hidden] { display: none !important; }
+
+/* Popover API + Anchor Positioning */
+.explain-popover {
+  width: min(92vw, 360px);
+  margin: 0;
+  padding: 0;
+  border: 2px solid var(--psy-cyan);
+  border-radius: 18px;
+  background: rgba(12, 0, 28, 0.96);
+  color: #fff;
+  box-shadow: 0 0 28px rgba(0, 240, 255, 0.35), 0 0 40px rgba(255, 45, 149, 0.2);
+  overflow: hidden;
+}
+.explain-popover:popover-open {
+  position-anchor: --formula-anchor;
+  position: absolute;
+  bottom: anchor(top);
+  left: anchor(center);
+  translate: -50% -12px;
   margin-bottom: 8px;
-  white-space: pre-wrap;
+}
+@supports not (anchor-name: --x) {
+  .explain-popover:popover-open {
+    position: fixed;
+    inset: auto 50% 18% auto;
+    translate: 50% 0;
+  }
+}
+.explain-popover::backdrop {
+  background: rgba(5, 0, 16, 0.55);
+  backdrop-filter: blur(3px);
+}
+.explain-popover-inner {
+  padding: 16px 14px 12px;
+  max-height: min(50vh, 320px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
-  max-height: 100%;
-  flex: 1 1 auto;
-  min-height: 0;
 }
-.explain[hidden] { display: none !important; }
+.explain-heading {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--psy-yellow);
+  text-shadow: 0 0 10px rgba(255, 234, 0, 0.45);
+}
+.explain-body {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  color: #e8f7ff;
+}
+.explain-close {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 12px;
+  border: 2px solid var(--psy-pink);
+  background: rgba(60, 0, 40, 0.9);
+  color: #fff;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 1rem;
+}
 
 .action-btn {
   width: min(100%, 320px);

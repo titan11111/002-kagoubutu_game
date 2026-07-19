@@ -78,7 +78,7 @@
       </div>
       <div id="prompt" class="prompt">水を作れ！</div>
       <div id="phase-tag" class="phase-tag">A列</div>
-      <div id="formula-preview" class="formula-preview">
+      <div id="formula-preview" class="formula-preview formula-anchor">
         <span id="slot-a" class="slot">？</span>
         <span class="plus">＋</span>
         <span id="slot-b" class="slot">？</span>
@@ -96,9 +96,18 @@
 
     <footer class="play-foot">
       <div id="feedback" class="feedback" hidden></div>
-      <div id="explain" class="explain" hidden></div>
+      <button type="button" id="explain-btn" class="explain-btn game-btn" hidden popovertarget="explain-pop">📖 解説を見る</button>
       <button type="button" id="next-btn" class="action-btn game-btn" hidden>次へ</button>
     </footer>
+  </div>
+
+  <!-- Popover API：解説カード（アンカー＝式プレビュー） -->
+  <div id="explain-pop" class="explain-popover" popover="auto">
+    <div class="explain-popover-inner">
+      <p id="explain-heading" class="explain-heading">ラボメモ</p>
+      <p id="explain-body" class="explain-body"></p>
+      <button type="button" class="explain-close game-btn" popovertarget="explain-pop" popovertargetaction="hide">閉じる</button>
+    </div>
   </div>
 
   <!-- 結果 -->

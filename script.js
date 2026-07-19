@@ -43,7 +43,10 @@
     choices: document.getElementById("choices"),
     check: document.getElementById("check-btn"),
     feedback: document.getElementById("feedback"),
-    explain: document.getElementById("explain"),
+    explainBtn: document.getElementById("explain-btn"),
+    explainPop: document.getElementById("explain-pop"),
+    explainHeading: document.getElementById("explain-heading"),
+    explainBody: document.getElementById("explain-body"),
     next: document.getElementById("next-btn"),
     resultStreak: document.getElementById("result-streak"),
     resultBest: document.getElementById("result-best"),
@@ -117,10 +120,55 @@
     return true;
   }
 
-  function showScreen(name) {
+  function applyScreen(name) {
     el.title.hidden = name !== "title";
     el.play.hidden = name !== "play";
     el.result.hidden = name !== "result";
+  }
+
+  /** View Transitions API（未対応は即切替） */
+  function showScreen(name) {
+    hideExplain();
+    const go = () => applyScreen(name);
+    if (typeof document.startViewTransition === "function") {
+      try {
+        document.startViewTransition(go);
+        return;
+      } catch (_) { /* fall through */ }
+    }
+    go();
+  }
+
+  function supportsPopover() {
+    return el.explainPop && typeof el.explainPop.showPopover === "function";
+  }
+
+  function hideExplain() {
+    if (!el.explainPop) return;
+    if (supportsPopover() && el.explainPop.matches(":popover-open")) {
+      try { el.explainPop.hidePopover(); } catch (_) { /* ignore */ }
+    }
+    if (el.explainBtn) el.explainBtn.hidden = true;
+  }
+
+  function showExplain(heading, body) {
+    if (!el.explainPop || !el.explainBody) return;
+    el.explainHeading.textContent = heading || "ラボメモ";
+    el.explainBody.textContent = body || "";
+    if (el.explainBtn) el.explainBtn.hidden = false;
+    if (supportsPopover()) {
+      try {
+        el.explainPop.showPopover();
+        return;
+      } catch (_) { /* fall through */ }
+    }
+    // フォールバック：画面下部に固定表示風
+    el.explainPop.style.display = "block";
+    el.explainPop.style.position = "fixed";
+    el.explainPop.style.left = "50%";
+    el.explainPop.style.bottom = "18%";
+    el.explainPop.style.transform = "translateX(-50%)";
+    el.explainPop.style.zIndex = "80";
   }
 
   function clearTimer() {
@@ -217,7 +265,10 @@
     el.check.hidden = true;
     el.check.disabled = true;
     el.feedback.hidden = true;
-    el.explain.hidden = true;
+    hideExplain();
+    if (el.explainPop && !supportsPopover()) {
+      el.explainPop.style.display = "none";
+    }
     el.next.hidden = true;
   }
 
@@ -319,13 +370,12 @@
     el.feedback.hidden = false;
     el.feedback.className = "feedback ok";
     el.feedback.textContent = "正解！ピンポンピンポン♪";
-    el.explain.hidden = false;
-    el.explain.textContent = current.explanation;
     el.choices.replaceChildren();
     el.check.hidden = true;
     el.next.hidden = false;
     el.next.textContent = "次の実験へ";
     setCountdown("♪", "idle");
+    showExplain("反応成功！ラボメモ", current.explanation);
   }
 
   function failRound(reason) {
@@ -352,13 +402,12 @@
     el.feedback.textContent = reason === "timeout"
       ? "時間切れ！ドカーン！！"
       : "反応失敗！ドカーン！！";
-    el.explain.hidden = false;
     const correctLine = `正解は ${current.a} ＋ ${current.b}`;
-    el.explain.textContent = `${correctLine}\n${current.explanation}`;
     el.choices.replaceChildren();
     el.next.hidden = false;
     el.next.textContent = "結果を見る";
     setCountdown("💥", "idle");
+    showExplain("爆発レポート", `${correctLine}\n${current.explanation}`);
   }
 
   function goNextFromFeedback() {
@@ -497,7 +546,20 @@
   });
 
   bindPochittClick(el.check, () => { onCheck(); });
-  bindPochittClick(el.next, () => { goNextFromFeedback(); });
+  bindPochittClick(el.next, () => {
+    hideExplain();
+    if (el.explainPop && !supportsPopover()) el.explainPop.style.display = "none";
+    goNextFromFeedback();
+  });
+  if (el.explainBtn) {
+    bindPochittClick(el.explainBtn, () => {
+      if (supportsPopover()) {
+        try { el.explainPop.showPopover(); } catch (_) { /* ignore */ }
+      } else if (el.explainPop) {
+        el.explainPop.style.display = "block";
+      }
+    });
+  }
   bindPochittClick(el.retry, async () => {
     await Sound.unlock();
     startGame(level, false);
@@ -527,7 +589,7 @@
   }, { passive: false });
 
   document.addEventListener("touchmove", (e) => {
-    const scrollable = e.target.closest(".explain, .screen-result");
+    const scrollable = e.target.closest(".explain-popover-inner, .screen-result");
     if (scrollable) return;
     e.preventDefault();
   }, { passive: false });

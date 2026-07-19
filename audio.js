@@ -1,12 +1,32 @@
-// Web Audio + SpeechSynthesis（mp3不要・iOSはジェスチャ後にunlock）
+// Web Audio + AudioWorklet + SpeechSynthesis（mp3不要・iOSはジェスチャ後にunlock）
 const Sound = (() => {
   let ctx = null;
   let muted = localStorage.getItem("kagoubutu_mute") === "1";
   let unlocked = false;
+  let workletReady = false;
+  let workletNode = null;
+  let workletGain = null;
 
   function getCtx() {
     if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
     return ctx;
+  }
+
+  async function setupWorklet() {
+    const c = getCtx();
+    if (workletReady || !c.audioWorklet) return;
+    try {
+      await c.audioWorklet.addModule(new URL("se-worklet.js", window.location.href).href);
+      workletNode = new AudioWorkletNode(c, "se-noise");
+      workletGain = c.createGain();
+      workletGain.gain.value = 1;
+      workletNode.connect(workletGain);
+      workletGain.connect(c.destination);
+      workletReady = true;
+    } catch (_) {
+      workletReady = false;
+      workletNode = null;
+    }
   }
 
   async function unlock() {
@@ -18,6 +38,7 @@ const Sound = (() => {
     src.connect(c.destination);
     src.start(0);
     unlocked = true;
+    await setupWorklet();
   }
 
   function beep(freq, dur, type = "square", vol = 0.08, when = 0) {
@@ -36,7 +57,7 @@ const Sound = (() => {
     osc.stop(t0 + dur + 0.02);
   }
 
-  function noiseBurst(dur, vol = 0.25) {
+  function noiseBurstFallback(dur, vol = 0.25) {
     if (muted || !unlocked) return;
     const c = getCtx();
     const len = Math.floor(c.sampleRate * dur);
@@ -59,11 +80,29 @@ const Sound = (() => {
     src.start();
   }
 
+  function noiseBurst(dur, vol = 0.25) {
+    if (muted || !unlocked) return;
+    if (workletReady && workletNode) {
+      workletNode.port.postMessage({
+        type: "burst",
+        duration: dur,
+        gain: vol,
+        decay: 0.001,
+      });
+      return;
+    }
+    noiseBurstFallback(dur, vol);
+  }
+
   function pinpon() {
-    beep(880, 0.12, "sine", 0.12, 0);
+    // 少し厚めの正解チャイム
+    beep(880, 0.12, "sine", 0.11, 0);
+    beep(880 * 2, 0.08, "triangle", 0.04, 0.02);
     beep(1175, 0.18, "sine", 0.12, 0.14);
+    beep(1175 * 2, 0.1, "triangle", 0.035, 0.16);
     beep(880, 0.12, "sine", 0.1, 0.36);
     beep(1175, 0.22, "sine", 0.12, 0.5);
+    beep(1568, 0.16, "sine", 0.06, 0.62);
   }
 
   function tick() {
@@ -74,23 +113,24 @@ const Sound = (() => {
     beep(523, 0.08, "triangle", 0.1, 0);
     beep(784, 0.12, "triangle", 0.1, 0.08);
     beep(1047, 0.18, "triangle", 0.12, 0.18);
+    beep(1319, 0.1, "sine", 0.05, 0.28);
   }
 
   function explode() {
     if (muted || !unlocked) return;
-    const c = getCtx();
-    // 低音ドーン
-    beep(60, 0.5, "sawtooth", 0.2, 0);
-    beep(40, 0.7, "square", 0.15, 0.05);
-    noiseBurst(0.9, 0.35);
-    // 二次爆発
-    setTimeout(() => noiseBurst(0.5, 0.28), 120);
-    setTimeout(() => beep(80, 0.4, "sawtooth", 0.12), 200);
-    setTimeout(() => noiseBurst(0.35, 0.2), 350);
+    beep(60, 0.55, "sawtooth", 0.22, 0);
+    beep(40, 0.75, "square", 0.16, 0.05);
+    beep(90, 0.35, "sawtooth", 0.1, 0.12);
+    noiseBurst(0.95, 0.38);
+    setTimeout(() => noiseBurst(0.55, 0.3), 110);
+    setTimeout(() => beep(70, 0.45, "sawtooth", 0.14), 180);
+    setTimeout(() => noiseBurst(0.4, 0.22), 320);
+    setTimeout(() => noiseBurst(0.25, 0.15), 480);
   }
 
   function tap() {
-    beep(600, 0.03, "square", 0.04);
+    beep(640, 0.028, "square", 0.045);
+    beep(980, 0.02, "triangle", 0.025, 0.015);
   }
 
   function speak(text, rate = 1.15) {
@@ -116,5 +156,9 @@ const Sound = (() => {
     return muted;
   }
 
-  return { unlock, pinpon, tick, jan, explode, tap, speak, setMuted, isMuted };
+  function usingWorklet() {
+    return workletReady;
+  }
+
+  return { unlock, pinpon, tick, jan, explode, tap, speak, setMuted, isMuted, usingWorklet };
 })();
