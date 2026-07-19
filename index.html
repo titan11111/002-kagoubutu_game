@@ -58,6 +58,14 @@
         <span class="level-desc">酸・塩基・鉱物 · 137問</span>
       </button>
     </div>
+    <button type="button" id="collection-btn" class="collection-entry game-btn">
+      <span class="collection-entry-icon">⚗</span>
+      <span>
+        <strong>化合物表</strong>
+        <small id="collection-summary">COLLECTION 0 / 167</small>
+      </span>
+      <span class="collection-entry-arrow">→</span>
+    </button>
   </div>
 
   <!-- プレイ（縦長専用レイアウト） -->
@@ -123,12 +131,42 @@
       <p id="result-title" class="result-title">君は【見習い錬成士】だ！</p>
       <p id="result-msg" class="result-msg"></p>
       <div class="result-actions">
+        <button type="button" id="result-collection-btn" class="action-btn collection-action game-btn">⚗ 化合物表を見る</button>
         <button type="button" id="retry-miss-btn" class="action-btn game-btn" hidden>ミスした問題だけ再挑戦</button>
         <button type="button" id="retry-btn" class="action-btn primary game-btn">もう一度やる</button>
         <button type="button" id="home-btn" class="action-btn game-btn">タイトルへ</button>
       </div>
     </div>
   </div>
+
+  <div id="screen-collection" class="screen screen-collection" hidden>
+    <div class="circuit-bg" aria-hidden="true"></div>
+    <header class="collection-head">
+      <button type="button" id="collection-back-btn" class="collection-back game-btn" aria-label="前の画面へ">←</button>
+      <div>
+        <p class="collection-kicker">COMPOUND CIRCUIT ARCHIVE</p>
+        <h2>化合物表</h2>
+      </div>
+      <div id="collection-count" class="collection-count">0 / 30</div>
+    </header>
+    <div class="collection-tabs" role="tablist" aria-label="実験室を選択">
+      <button type="button" class="collection-tab game-btn active" data-collection-level="elementary" role="tab">小5ラボ</button>
+      <button type="button" class="collection-tab game-btn" data-collection-level="junior" role="tab">中3ラボ</button>
+    </div>
+    <div class="collection-progress" aria-hidden="true">
+      <div id="collection-progress-fill" class="collection-progress-fill"></div>
+    </div>
+    <p class="collection-guide">正解した反応だけが<span>通電</span>する。生成物をタップするとラボメモを確認できます。</p>
+    <main id="collection-grid" class="collection-grid"></main>
+  </div>
+
+  <dialog id="compound-detail" class="compound-detail">
+    <button type="button" id="compound-detail-close" class="compound-detail-close game-btn" aria-label="閉じる">×</button>
+    <p class="compound-detail-kicker">REACTION LOG</p>
+    <h3 id="compound-detail-name"></h3>
+    <div id="compound-detail-formula" class="compound-detail-formula"></div>
+    <p id="compound-detail-body" class="compound-detail-body"></p>
+  </dialog>
 
   <!-- 爆発オーバーレイ -->
   <div id="boom-layer" class="boom-layer" hidden>

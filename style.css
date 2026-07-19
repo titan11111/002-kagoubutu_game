@@ -35,6 +35,7 @@
 .screen-title { view-transition-name: screen-title; }
 .screen-play { view-transition-name: screen-play; }
 .screen-result { view-transition-name: screen-result; }
+.screen-collection { view-transition-name: screen-collection; }
 .formula-anchor { view-transition-name: formula; }
 
 *, *::before, *::after {
@@ -896,4 +897,362 @@ body.flash-ok { animation: flashOk 0.35s ease; }
   .brand-tag, .title-pulse { display: none; }
   .pick-label { margin: 4px 0; font-size: 0.85rem; }
   .level-desc { display: none; }
+}
+/* ===== 化合物表：正解した反応だけが通電する配線図 ===== */
+.collection-entry {
+  width: min(430px, calc(100% - 40px));
+  margin: 18px auto 0;
+  padding: 11px 16px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  color: #eaffff;
+  text-align: left;
+  border: 1px solid rgba(74, 245, 255, 0.65);
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(19, 224, 213, 0.17), rgba(8, 11, 28, 0.88) 52%), #080b1c;
+  box-shadow: 0 0 18px rgba(0, 245, 255, 0.15), inset 3px 0 #40f6ee;
+}
+
+.collection-entry-icon {
+  color: var(--psy-cyan);
+  font-size: 1.75rem;
+  filter: drop-shadow(0 0 8px var(--psy-cyan));
+}
+
+.collection-entry strong {
+  display: block;
+  font-size: 1rem;
+  letter-spacing: 0.16em;
+}
+
+.collection-entry small {
+  color: rgba(215, 255, 253, 0.65);
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+}
+
+.collection-entry-arrow { color: var(--psy-lime); font-size: 1.35rem; }
+
+.screen-collection {
+  min-height: 100dvh;
+  padding: max(18px, env(safe-area-inset-top)) 16px max(38px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+  color: #edffff;
+  background:
+    radial-gradient(circle at 16% 8%, rgba(0, 255, 225, 0.16), transparent 30%),
+    radial-gradient(circle at 90% 30%, rgba(255, 38, 163, 0.13), transparent 32%),
+    #050712;
+}
+
+.circuit-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.22;
+  background-image:
+    linear-gradient(rgba(102, 242, 255, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(102, 242, 255, 0.16) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(to bottom, black, transparent 85%);
+}
+
+.collection-head {
+  position: relative;
+  width: min(900px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.collection-back {
+  width: 42px;
+  height: 42px;
+  color: #071014;
+  font-size: 1.4rem;
+  font-weight: 900;
+  border: 0;
+  border-radius: 50%;
+  background: var(--psy-cyan);
+  box-shadow: 0 0 18px rgba(60, 245, 255, 0.55);
+}
+
+.collection-kicker,
+.compound-detail-kicker {
+  margin: 0 0 2px;
+  color: var(--psy-cyan);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+}
+
+.collection-head h2 {
+  margin: 0;
+  font-size: clamp(1.65rem, 7vw, 2.6rem);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.collection-count {
+  padding: 7px 10px;
+  color: var(--psy-lime);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-weight: 900;
+  border: 1px solid rgba(184, 255, 0, 0.45);
+  background: rgba(184, 255, 0, 0.08);
+}
+
+.collection-tabs {
+  position: relative;
+  width: min(600px, 100%);
+  margin: 24px auto 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.collection-tab {
+  padding: 11px;
+  color: rgba(233, 255, 255, 0.55);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  border: 1px solid rgba(122, 220, 229, 0.22);
+  border-radius: 2px;
+  background: rgba(6, 10, 22, 0.74);
+}
+
+.collection-tab.active {
+  color: #051312;
+  border-color: var(--psy-cyan);
+  background: var(--psy-cyan);
+  box-shadow: 0 0 20px rgba(58, 242, 255, 0.3);
+}
+
+.collection-progress {
+  position: relative;
+  width: min(600px, 100%);
+  height: 5px;
+  margin: 0 auto;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.collection-progress-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--psy-cyan), var(--psy-lime));
+  box-shadow: 0 0 12px var(--psy-cyan);
+  transition: width 500ms ease;
+}
+
+.collection-guide {
+  position: relative;
+  width: min(600px, 100%);
+  margin: 13px auto 22px;
+  color: rgba(226, 246, 248, 0.58);
+  font-size: 0.72rem;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.collection-guide span { color: var(--psy-lime); font-weight: 900; }
+
+.collection-grid {
+  position: relative;
+  width: min(900px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 10px;
+}
+
+.reaction-card {
+  --wire: rgba(120, 148, 158, 0.22);
+  display: grid;
+  grid-template-columns: 38px minmax(92px, 0.9fr) minmax(70px, 0.65fr) minmax(120px, 1.15fr);
+  align-items: stretch;
+  min-height: 86px;
+  overflow: hidden;
+  border: 1px solid rgba(115, 157, 168, 0.18);
+  background: rgba(4, 8, 18, 0.8);
+  animation: circuit-enter 420ms both;
+  animation-delay: var(--card-delay);
+}
+
+.reaction-card.unlocked {
+  --wire: var(--psy-cyan);
+  border-color: rgba(60, 245, 255, 0.34);
+  background: linear-gradient(90deg, rgba(28, 234, 225, 0.08), transparent 58%), rgba(4, 8, 18, 0.92);
+  box-shadow: inset 3px 0 var(--psy-cyan), 0 0 14px rgba(28, 234, 225, 0.07);
+}
+
+.reaction-number {
+  display: grid;
+  place-items: center;
+  color: rgba(203, 234, 238, 0.32);
+  font: 700 0.62rem ui-monospace, "SFMono-Regular", Menlo, monospace;
+  writing-mode: vertical-rl;
+  border-right: 1px solid rgba(115, 157, 168, 0.14);
+}
+
+.reaction-inputs {
+  padding: 10px 7px;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-content: center;
+  gap: 2px;
+  text-align: center;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.reaction-inputs span {
+  padding: 3px 4px;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--wire);
+  background: rgba(50, 220, 220, 0.04);
+}
+
+.reaction-inputs i {
+  color: var(--wire);
+  font-style: normal;
+  line-height: 0.8;
+}
+
+.reaction-process {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-content: center;
+  justify-items: center;
+}
+
+.reaction-line {
+  width: 100%;
+  height: 1px;
+  background: var(--wire);
+}
+
+.reaction-process b {
+  padding: 3px 5px;
+  color: var(--wire);
+  font-size: 0.55rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  border: 1px solid var(--wire);
+}
+
+.unlocked .reaction-line,
+.unlocked .reaction-process b { box-shadow: 0 0 8px var(--psy-cyan); }
+
+.reaction-output {
+  position: relative;
+  margin: 8px;
+  padding: 8px;
+  color: rgba(219, 238, 240, 0.35);
+  text-align: left;
+  border: 1px solid rgba(123, 155, 164, 0.2);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.reaction-output small {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 0.48rem;
+  letter-spacing: 0.16em;
+}
+
+.reaction-output strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: clamp(0.73rem, 2.8vw, 0.95rem);
+}
+
+.unlocked .reaction-output {
+  color: #07120f;
+  border-color: var(--psy-lime);
+  background: var(--psy-lime);
+  box-shadow: 0 0 15px rgba(184, 255, 0, 0.28);
+}
+
+.unlocked .reaction-output::after {
+  content: "›";
+  position: absolute;
+  top: 50%;
+  right: 7px;
+  transform: translateY(-50%);
+  font-size: 1.25rem;
+}
+
+.compound-detail {
+  width: min(480px, calc(100% - 30px));
+  padding: 26px;
+  color: #ecffff;
+  border: 1px solid var(--psy-cyan);
+  border-radius: 3px;
+  background: radial-gradient(circle at top right, rgba(255, 45, 149, 0.18), transparent 35%), #080b18;
+  box-shadow: 0 0 40px rgba(38, 237, 242, 0.25);
+}
+
+.compound-detail::backdrop {
+  background: rgba(1, 3, 10, 0.82);
+  backdrop-filter: blur(5px);
+}
+
+.compound-detail-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 34px;
+  height: 34px;
+  color: #071014;
+  font-size: 1.3rem;
+  font-weight: 900;
+  border: 0;
+  border-radius: 50%;
+  background: var(--psy-cyan);
+}
+
+.compound-detail h3 {
+  margin: 8px 36px 16px 0;
+  color: var(--psy-lime);
+  font-size: 1.5rem;
+}
+
+.compound-detail-formula {
+  padding: 13px;
+  color: #fff;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-weight: 800;
+  line-height: 1.5;
+  border-left: 3px solid var(--psy-cyan);
+  background: rgba(39, 241, 238, 0.09);
+}
+
+.compound-detail-body {
+  margin: 18px 0 0;
+  color: rgba(235, 252, 255, 0.78);
+  font-size: 0.9rem;
+  line-height: 1.85;
+}
+
+.collection-action {
+  color: #05201d;
+  border-color: var(--psy-cyan);
+  background: var(--psy-cyan);
+}
+
+@keyframes circuit-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (min-width: 700px) {
+  .collection-grid { grid-template-columns: 1fr 1fr; }
+  .reaction-card {
+    grid-template-columns: 32px minmax(86px, 0.9fr) 66px minmax(110px, 1.1fr);
+  }
 }

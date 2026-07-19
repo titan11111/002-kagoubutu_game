@@ -4,6 +4,7 @@
 
   const TIME_LIMIT = 10;
   const BEST_KEY_PREFIX = "compound-lab-best-";
+  const COLLECTION_KEY_PREFIX = "compound-lab-collection-";
 
   const TITLES = [
     { min: 0, name: "見習い錬成士", msg: "実験は始まったばかり！もう一回ふるえば、きっと見える世界が変わるぞ。" },
@@ -29,6 +30,7 @@
     title: document.getElementById("screen-title"),
     play: document.getElementById("screen-play"),
     result: document.getElementById("screen-result"),
+    collection: document.getElementById("screen-collection"),
     mute: document.getElementById("mute-btn"),
     streak: document.getElementById("streak-label"),
     titleChip: document.getElementById("title-chip"),
@@ -55,6 +57,19 @@
     retryMiss: document.getElementById("retry-miss-btn"),
     retry: document.getElementById("retry-btn"),
     home: document.getElementById("home-btn"),
+    collectionEntry: document.getElementById("collection-btn"),
+    collectionSummary: document.getElementById("collection-summary"),
+    resultCollection: document.getElementById("result-collection-btn"),
+    collectionBack: document.getElementById("collection-back-btn"),
+    collectionCount: document.getElementById("collection-count"),
+    collectionProgress: document.getElementById("collection-progress-fill"),
+    collectionGrid: document.getElementById("collection-grid"),
+    collectionTabs: Array.from(document.querySelectorAll(".collection-tab")),
+    compoundDetail: document.getElementById("compound-detail"),
+    compoundDetailClose: document.getElementById("compound-detail-close"),
+    compoundDetailName: document.getElementById("compound-detail-name"),
+    compoundDetailFormula: document.getElementById("compound-detail-formula"),
+    compoundDetailBody: document.getElementById("compound-detail-body"),
     boom: document.getElementById("boom-layer"),
     boomCanvas: document.getElementById("boom-canvas"),
     popFx: document.getElementById("pop-fx"),
@@ -75,6 +90,8 @@
   let timerId = null;
   let timeLeft = TIME_LIMIT;
   let locked = false;
+  let collectionLevel = "elementary";
+  let screenBeforeCollection = "title";
 
   function shuffle(arr) {
     const a = arr.slice();
@@ -120,10 +137,126 @@
     return true;
   }
 
+  function questionId(lv, index, question) {
+    return `${lv}-${index}-${question.target}`;
+  }
+
+  function collectionKey(lv) {
+    return `${COLLECTION_KEY_PREFIX}${lv}`;
+  }
+
+  function loadCollection(lv) {
+    try {
+      const values = JSON.parse(localStorage.getItem(collectionKey(lv)) || "[]");
+      return new Set(Array.isArray(values) ? values : []);
+    } catch (_) {
+      return new Set();
+    }
+  }
+
+  function unlockCurrentCompound() {
+    if (!current) return false;
+    const unlocked = loadCollection(level);
+    const id = current._id || current.target;
+    if (unlocked.has(id)) return false;
+    unlocked.add(id);
+    localStorage.setItem(collectionKey(level), JSON.stringify(Array.from(unlocked)));
+    updateCollectionSummary();
+    return true;
+  }
+
+  function updateCollectionSummary() {
+    if (!el.collectionSummary) return;
+    const total = QUIZ_ELEMENTARY.length + QUIZ_JUNIOR.length;
+    const found = loadCollection("elementary").size + loadCollection("junior").size;
+    el.collectionSummary.textContent = `COLLECTION ${Math.min(found, total)} / ${total}`;
+  }
+
+  function showCompoundDetail(question) {
+    if (!el.compoundDetail) return;
+    el.compoundDetailName.textContent = question.target;
+    el.compoundDetailFormula.textContent = `${question.a} ＋ ${question.b} → ${question.target}`;
+    el.compoundDetailBody.textContent = question.explanation;
+    if (typeof el.compoundDetail.showModal === "function") el.compoundDetail.showModal();
+    else el.compoundDetail.setAttribute("open", "");
+  }
+
+  function renderCollection(lv) {
+    collectionLevel = lv;
+    const bank = getQuizBank(lv);
+    const unlocked = loadCollection(lv);
+    const found = bank.reduce((sum, question, index) => (
+      sum + (unlocked.has(questionId(lv, index, question)) ? 1 : 0)
+    ), 0);
+
+    el.collectionCount.textContent = `${found} / ${bank.length}`;
+    el.collectionProgress.style.width = `${bank.length ? (found / bank.length) * 100 : 0}%`;
+    el.collectionTabs.forEach((tab) => {
+      const active = tab.dataset.collectionLevel === lv;
+      tab.classList.toggle("active", active);
+      tab.setAttribute("aria-selected", String(active));
+    });
+
+    el.collectionGrid.replaceChildren();
+    bank.forEach((question, index) => {
+      const isUnlocked = unlocked.has(questionId(lv, index, question));
+      const card = document.createElement("article");
+      card.className = `reaction-card ${isUnlocked ? "unlocked" : "locked"}`;
+      card.style.setProperty("--card-delay", `${Math.min(index, 12) * 35}ms`);
+
+      const number = document.createElement("span");
+      number.className = "reaction-number";
+      number.textContent = String(index + 1).padStart(3, "0");
+
+      const inputs = document.createElement("div");
+      inputs.className = "reaction-inputs";
+      const inputA = document.createElement("span");
+      const plus = document.createElement("i");
+      const inputB = document.createElement("span");
+      inputA.textContent = isUnlocked ? question.a : "？？";
+      plus.textContent = "＋";
+      inputB.textContent = isUnlocked ? question.b : "？？";
+      inputs.append(inputA, plus, inputB);
+
+      const process = document.createElement("div");
+      process.className = "reaction-process";
+      const lineA = document.createElement("span");
+      const processLabel = document.createElement("b");
+      const lineB = document.createElement("span");
+      lineA.className = "reaction-line";
+      lineB.className = "reaction-line";
+      processLabel.textContent = isUnlocked ? "反応成功" : "未反応";
+      process.append(lineA, processLabel, lineB);
+
+      const output = document.createElement("button");
+      output.type = "button";
+      output.className = "reaction-output game-btn";
+      output.disabled = !isUnlocked;
+      const outputLabel = document.createElement("small");
+      const outputName = document.createElement("strong");
+      outputLabel.textContent = isUnlocked ? "PRODUCT" : "UNKNOWN";
+      outputName.textContent = isUnlocked ? question.target : "？？？？？";
+      output.append(outputLabel, outputName);
+      if (isUnlocked) output.addEventListener("click", () => showCompoundDetail(question));
+
+      card.append(number, inputs, process, output);
+      el.collectionGrid.appendChild(card);
+    });
+  }
+
+  function openCollection(from) {
+    screenBeforeCollection = from || "title";
+    renderCollection(collectionLevel);
+    showScreen("collection");
+    el.collection.scrollTop = 0;
+  }
+
   function applyScreen(name) {
     el.title.hidden = name !== "title";
     el.play.hidden = name !== "play";
     el.result.hidden = name !== "result";
+    el.collection.hidden = name !== "collection";
+    if (name === "title") updateCollectionSummary();
   }
 
   /** View Transitions API（未対応は即切替） */
@@ -277,7 +410,7 @@
       // デッキ尽きたらシャッフルして継続（連続型）
       const bank = missOnlyMode
         ? missed.slice()
-        : getQuizBank(level).map((q, i) => ({ ...q, _id: `${level}-${i}-${q.target}` }));
+        : getQuizBank(level).map((q, i) => ({ ...q, _id: questionId(level, i, q) }));
       if (!bank.length) {
         endRun(false);
         return;
@@ -360,6 +493,7 @@
   function succeedRound() {
     phase = "feedback";
     streak += 1;
+    const newlyUnlocked = unlockCurrentCompound();
     saveBestIfNeeded();
     updateHud();
     Sound.pinpon();
@@ -369,7 +503,9 @@
 
     el.feedback.hidden = false;
     el.feedback.className = "feedback ok";
-    el.feedback.textContent = "正解！ピンポンピンポン♪";
+    el.feedback.textContent = newlyUnlocked
+      ? "正解！化合物表に新しい反応を登録！"
+      : "正解！ピンポンピンポン♪";
     el.choices.replaceChildren();
     el.check.hidden = true;
     el.next.hidden = false;
@@ -506,7 +642,7 @@
 
     const source = onlyMiss
       ? missed.slice()
-      : getQuizBank(level).map((q, i) => ({ ...q, _id: `${level}-${i}-${q.target}` }));
+      : getQuizBank(level).map((q, i) => ({ ...q, _id: questionId(level, i, q) }));
 
     if (!source.length) {
       alert("問題がありません");
@@ -573,12 +709,30 @@
     clearTimer();
     showScreen("title");
   });
+  bindPochittClick(el.collectionEntry, () => openCollection("title"));
+  bindPochittClick(el.resultCollection, () => openCollection("result"));
+  bindPochittClick(el.collectionBack, () => showScreen(screenBeforeCollection));
+  el.collectionTabs.forEach((tab) => {
+    bindPochittClick(tab, () => renderCollection(tab.dataset.collectionLevel));
+  });
+  bindPochittClick(el.compoundDetailClose, () => {
+    if (typeof el.compoundDetail.close === "function") el.compoundDetail.close();
+    else el.compoundDetail.removeAttribute("open");
+  });
+  if (el.compoundDetail) {
+    el.compoundDetail.addEventListener("click", (event) => {
+      if (event.target !== el.compoundDetail) return;
+      if (typeof el.compoundDetail.close === "function") el.compoundDetail.close();
+      else el.compoundDetail.removeAttribute("open");
+    });
+  }
   bindPochittClick(el.mute, () => {
     const next = !Sound.isMuted();
     Sound.setMuted(next);
     el.mute.textContent = next ? "🔇" : "🔊";
   });
   el.mute.textContent = Sound.isMuted() ? "🔇" : "🔊";
+  updateCollectionSummary();
 
   // iOS 対策：ダブルタップズーム / 長押し選択 / ピンチ / スクロールバウンス
   let lastTap = 0;
